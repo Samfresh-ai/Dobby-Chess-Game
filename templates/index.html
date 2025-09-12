@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Dobby Chess Game</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="/static/css/chessboard-1.0.0.min.css">
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="/static/js/chessboard-1.0.0.min.js"></script>
+    <script src="/static/js/chess.min.js"></script>
+    <script src="https://cdn.socket.io/4.8.1/socket.io.min.js"></script>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(to bottom, #2c3e50, #bdc3c7);
+            color: #ecf0f1;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+        h1 {
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+            margin-bottom: 20px;
+        }
+        #container {
+            display: flex;
+            flex-direction: row;
+            justify-content: center;
+            align-items: flex-start;
+            width: 100%;
+            max-width: min(90vw, 800px);
+        }
+        #board {
+            width: min(50vw, 400px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        #chat {
+            width: min(40vw, 300px);
+            margin-left: min(2vw, 20px);
+            background: rgba(255,255,255,0.1);
+            border-radius: 8px;
+            padding: 15px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+        }
+        #chat-log {
+            height: min(30vh, 250px);
+            overflow-y: scroll;
+            background: rgba(0,0,0,0.2);
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 10px;
+            font-size: 14px;  /* Smaller text for chat */
+        }
+        #chat-log p {
+            margin: 5px 0;
+            color: #ecf0f1;
+            font-size: 14px;  /* Smaller text */
+        }
+        #credit {
+            text-align: center;
+            margin-top: 20px;
+            cursor: pointer;
+            color: #3498db;
+            text-decoration: underline;
+        }
+        #links {
+            text-align: center;
+            margin-top: 10px;
+        }
+        #links a {
+            color: #3498db;
+            text-decoration: none;
+            margin: 0 10px;
+        }
+        #links a:hover {
+            text-decoration: underline;
+        }
+        button {
+            background: linear-gradient(to right, #2980b9, #2c3e50);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            margin: 5px;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: transform 0.2s;
+            width: 200px;
+            height: 100px;
+            font-size: 16px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+        button:hover {
+            transform: scale(1.05);
+        }
+        input {
+            width: 100%;
+            padding: 8px;
+            margin-bottom: 10px;
+            border-radius: 4px;
+            border: 1px solid #bdc3c7;
+            background: rgba(255,255,255,0.8);
+        }
+        #restart {
+            background: linear-gradient(to right, #e74c3c, #c0392b);
+            width: auto;
+            height: auto;
+        }
+        #welcome {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            max-width: 500px;
+        }
+        .pfp {
+            font-size: 40px;
+            margin-bottom: 10px;  /* Separate from text */
+        }
+        #multiplayer {
+            background: linear-gradient(to right, #95a5a6, #7f8c8d);
+            text-decoration: line-through;
+            cursor: not-allowed;
+        }
+        #captured-pieces {
+            display: flex;
+            justify-content: space-between;
+            width: 100%;
+            max-width: min(90vw, 800px);
+            margin-bottom: 20px;
+            font-size: 20px;
+        }
+        #captured-player, #captured-bot {
+            background: rgba(255,255,255,0.1);
+            padding: 10px;
+            border-radius: 4px;
+        }
+        @media (max-width: 768px) {
+            body {
+                padding: 10px 5px;
+            }
+            h1 {
+                font-size: 24px;
+            }
+            #container {
+                flex-direction: column;
+                align-items: center;
+            }
+            #board {
+                width: min(90vw, 400px);
+            }
+            #chat {
+                width: min(90vw, 400px);
+                margin-left: 0;
+                margin-top: 20px;
+            }
+            button {
+                width: 140px;
+                height: 80px;
+                font-size: 14px;
+            }
+            .pfp {
+                font-size: 30px;
+            }
+            #captured-pieces {
+                flex-direction: column;
+                align-items: center;
+                font-size: 16px;
+            }
+            #captured-player, #captured-bot {
+                margin-bottom: 10px;
+                width: min(90vw, 400px);
+                text-align: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <h1>Dobby Chess Game</h1>
+    <div id="welcome">
+        <p>Select Bot Difficulty:</p>
+        <button onclick="selectDifficulty('novice')"><span class="pfp">😄</span>Novice (Level 1)</button>
+        <button onclick="selectDifficulty('apprentice')"><span class="pfp">🧑‍🎓</span>Apprentice (Level 2)</button>
+        <button onclick="selectDifficulty('journeyman')"><span class="pfp">🛠️</span>Journeyman (Level 3)</button>
+        <button onclick="selectDifficulty('expert')"><span class="pfp">🧠</span>Expert (Level 4)</button>
+        <button onclick="selectDifficulty('master')"><span class="pfp">🏆</span>Master (Level 5)</button>
+        <button onclick="selectDifficulty('grandmaster')"><span class="pfp">👑</span>Grandmaster (Level 6)</button>
+        <button id="multiplayer">MULTIPLAYER (Coming Soon)</button>
+    </div>
+    <div id="game" style="display:none;">
+        <div id="captured-pieces">
+            <div id="captured-player">Player's Captures: </div>
+            <div id="captured-bot">Bot's Captures: </div>
+        </div>
+        <div id="container">
+            <div id="board"></div>
+            <div id="chat">
+                <div id="chat-log"></div>
+                <input id="chat-input" type="text" placeholder="Trash talk the bot...">
+                <button onclick="sendChat()">Send</button>
+            </div>
+        </div>
+        <button id="restart" onclick="restartGame()">Change Difficulty / Restart</button>
+    </div>
+    <div id="credit" onclick="window.open('https://x.com/0xsamxbt')">Made by 0xsamxbt (visit X profile)</div>
+    <div id="links">
+        <a href="https://github.com/Samfresh-ai" target="_blank">GitHub</a>
+        <a href="https://x.com/0xsamxbt" target="_blank">Support</a>
+    </div>
+
+    <script>
+        var socket = io();
+        var chess = new Chess();
+        var board = Chessboard('board', {
+            draggable: true,
+            pieceTheme: '/static/img/chesspieces/default/{piece}.png',
+            onDrop: function(source, target) {
+                var move = chess.move({from: source, to: target, promotion: 'q'});
+                if (move === null) return 'snapback';
+                socket.emit('player_move', {move: source + target + (move.promotion ? move.promotion : '')});
+            }
+        });
+
+        function pieceToUnicode(piece) {
+            const unicodeMap = {
+                'p': '♟︎', 'P': '♙', 'n': '♞', 'N': '♘', 'b': '♝', 'B': '♗',
+                'r': '♜', 'R': '♖', 'q': '♛', 'Q': '♕', 'k': '♚', 'K': '♔'
+            };
+            return unicodeMap[piece] || piece;
+        }
+
+        socket.on('start_game', function(data) {
+            document.getElementById('welcome').style.display = 'none';
+            document.getElementById('game').style.display = 'block';
+            updateBoard(data.fen);
+            document.getElementById('captured-player').innerText = "Player's Captures: " + (data.captured_white || []).map(pieceToUnicode).join(' ');
+            document.getElementById('captured-bot').innerText = "Bot's Captures: " + (data.captured_black || []).map(pieceToUnicode).join(' ');
+        });
+
+        socket.on('update_board', function(data) {
+            updateBoard(data.fen);
+            document.getElementById('captured-player').innerText = "Player's Captures: " + (data.captured_white || []).map(pieceToUnicode).join(' ');
+            document.getElementById('captured-bot').innerText = "Bot's Captures: " + (data.captured_black || []).map(pieceToUnicode).join(' ');
+        });
+
+        socket.on('game_over', function(data) {
+            alert(data.message);
+        });
+
+        socket.on('chat_update', function(data) {
+            var log = document.getElementById('chat-log');
+            if (data.user) {
+                log.innerHTML += '<p><strong>You:</strong> ' + data.user + '</p>';
+            }
+            log.innerHTML += '<p><strong>Bot:</strong> ' + data.bot + '</p>';
+            log.scrollTop = log.scrollHeight;
+        });
+
+        socket.on('show_welcome', function() {
+            document.getElementById('game').style.display = 'none';
+            document.getElementById('welcome').style.display = 'flex';
+            document.getElementById('chat-log').innerHTML = '';
+            document.getElementById('captured-player').innerText = "Player's Captures: ";
+            document.getElementById('captured-bot').innerText = "Bot's Captures: ";
+        });
+
+        function updateBoard(fen) {
+            chess.load(fen);
+            board.position(fen);
+        }
+
+        function selectDifficulty(diff) {
+            socket.emit('select_difficulty', {difficulty: diff});
+        }
+
+        function sendChat() {
+            var input = document.getElementById('chat-input');
+            if (input.value) {
+                socket.emit('chat_message', {message: input.value});
+                input.value = '';
+            }
+        }
+
+        function restartGame() {
+            socket.emit('restart_game');
+        }
+
+        // Enter key for chat
+        document.getElementById('chat-input').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') sendChat();
+        });
+    </script>
+</body>
+</html>
